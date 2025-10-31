@@ -1,53 +1,42 @@
-package com.example.notesapp
+package com.example.smartnoteapp
 
 import android.content.Intent
 import android.os.Bundle
+import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
-import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
-import com.example.notesapp.data.Note
-import com.example.notesapp.data.NoteDatabase
-import com.example.notesapp.databinding.ActivityMainBinding
-import com.example.notesapp.ui.NoteAdapter
-import kotlinx.coroutines.launch
+import com.example.smartnoteapp.databinding.ActivityMainBinding
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
+    private val viewModel: NoteViewModel by viewModels()
     private lateinit var adapter: NoteAdapter
-    private val db by lazy { NoteDatabase.getDatabase(this) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        adapter = NoteAdapter { note ->
-            lifecycleScope.launch {
-                db.noteDao().delete(note)
-                loadNotes()
-            }
+        // Setup RecyclerView
+        adapter = NoteAdapter(listOf()) { note ->
+            val intent = Intent(this, AddEditNoteActivity::class.java)
+            intent.putExtra("noteId", note.id)
+            startActivity(intent)
         }
 
-        binding.recyclerView.layoutManager = LinearLayoutManager(this)
-        binding.recyclerView.adapter = adapter
+        binding.recyclerViewNotes.layoutManager = LinearLayoutManager(this)
+        binding.recyclerViewNotes.adapter = adapter
 
+        // Observe database changes
+        viewModel.allNotes.observe(this) { notes ->
+            adapter.updateNotes(notes)
+        }
+
+        // Add new note
         binding.fabAddNote.setOnClickListener {
-            startActivity(Intent(this, AddNoteActivity::class.java))
+            val intent = Intent(this, AddEditNoteActivity::class.java)
+            startActivity(intent)
         }
-
-        loadNotes()
-    }
-
-    private fun loadNotes() {
-        lifecycleScope.launch {
-            val notes = db.noteDao().getAllNotes()
-            adapter.submitList(notes)
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        loadNotes()
     }
 }
