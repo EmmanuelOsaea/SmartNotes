@@ -1,28 +1,42 @@
-class NoteAdapter(private var notes: List<Note>, private val onClick: (Note) -> Unit) :
-    RecyclerView.Adapter<NoteAdapter.NoteViewHolder>() {
+package com.example.smartnoteapp
 
-    inner class NoteViewHolder(view: View) : RecyclerView.ViewHolder(view) {
-        val title: TextView = view.findViewById(R.id.textTitle)
-        val content: TextView = view.findViewById(R.id.textContent)
-        val date: TextView = view.findViewById(R.id.textDate)
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import androidx.recyclerview.widget.RecyclerView
+import com.example.smartnoteapp.databinding.ItemNoteBinding
+
+class NoteAdapter(
+    private var notes: List<Note>,
+    private val onItemClicked: (Note) -> Unit,
+    private val onDeleteClicked: (Note) -> Unit
+) : RecyclerView.Adapter<NoteAdapter.NoteViewHolder>() {
+
+    inner class NoteViewHolder(val binding: ItemNoteBinding) :
+        RecyclerView.ViewHolder(binding.root) {
+        fun bind(note: Note) {
+            binding.tvTitle.text = note.title
+            binding.tvContent.text = note.content
+            binding.tvTimestamp.text = note.timestamp
+
+            binding.root.setOnClickListener { onItemClicked(note) }
+            binding.btnDelete.setOnClickListener { onDeleteClicked(note) }
+        }
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): NoteViewHolder {
-        val view = LayoutInflater.from(parent.context).inflate(R.layout.item_note, parent, false)
-        return NoteViewHolder(view)
+        val binding =
+            ItemNoteBinding.inflate(LayoutInflater.from(parent.context), parent, false)
+        return NoteViewHolder(binding)
     }
 
     override fun getItemCount() = notes.size
 
     override fun onBindViewHolder(holder: NoteViewHolder, position: Int) {
-        val note = notes[position]
-        holder.title.text = note.title
-        holder.content.text = note.content
-        holder.date.text = SimpleDateFormat("EEE, d MMM yyyy", Locale.getDefault()).format(note.date)
-        holder.itemView.setOnClickListener { onClick(note) }
+        holder.bind(notes[position])
     }
 
-    fun updateNotes(newNotes: List<Note>) {
+    fun updateList(newNotes: List<Note>) {
         notes = newNotes
         notifyDataSetChanged()
     }
