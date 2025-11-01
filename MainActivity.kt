@@ -6,7 +6,7 @@ import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.smartnoteapp.databinding.ActivityMainBinding
-
+import androidx.lifecycle.Observer
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
@@ -38,5 +38,24 @@ class MainActivity : AppCompatActivity() {
             val intent = Intent(this, AddEditNoteActivity::class.java)
             startActivity(intent)
         }
+    }
+}
+
+
+
+private fun addNoteDialog() {
+        val dialog = NoteDialog(this) { title, content ->
+            val newNote = Note(title = title, content = content)
+            viewModel.insert(newNote)
+        }
+        dialog.show()
+    }
+
+    private fun editNoteDialog(note: Note) {
+        val dialog = NoteDialog(this, note) { title, content ->
+            val updatedNote = note.copy(title = title, content = content)
+            viewModel.update(updatedNote)
+        }
+        dialog.show()
     }
 }
