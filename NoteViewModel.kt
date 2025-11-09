@@ -13,7 +13,8 @@ class NoteViewModel(application: Application) : AndroidViewModel(application) {
     init {
         val dao = NoteDatabase.getDatabase(application).noteDao()
         repository = NoteRepository(dao)
-        allNotes = repository.getAllNotes()
+        allNotes = repository.allNotes
+        
     }
 
     fun insert(note: Note) = viewModelScope.launch {
