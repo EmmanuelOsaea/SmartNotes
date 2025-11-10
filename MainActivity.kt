@@ -1,61 +1,99 @@
-package com.example.smartnoteapp
+package com.example.financetracker
 
-import android.content.Intent
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
-import androidx.recyclerview.widget.LinearLayoutManager
-import com.example.smartnoteapp.databinding.ActivityMainBinding
 import androidx.lifecycle.Observer
+import androidx.recyclerview.widget.LinearLayoutManager
+import com.example.financetracker.data.Transaction
+import com.example.financetracker.databinding.ActivityMainBinding
+import com.example.financetracker.viewmodel.TransactionViewModel
+import com.google.firebase.database.FirebaseDatabase
+
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
-    private val viewModel: NoteViewModel by viewModels()
-    private lateinit var adapter: NoteAdapter
+    private val viewModel: TransactionViewModel by viewModels()
+    private lateinit var adapter: TransactionAdapter
+    private val database = FirebaseDatabase.getInstance().getReference("transactions")
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        // Setup RecyclerView
-        adapter = NoteAdapter(listOf()) { note ->
-            val intent = Intent(this, AddEditNoteActivity::class.java)
-            intent.putExtra("noteId", note.id)
-            startActivity(intent)
+        // ✅ RecyclerView setup
+        adapter = TransactionAdapter { transaction ->
+            viewModel.delete(transaction)
+            database.child(transaction.id ?: "").removeValue()
+            Toast.makeText(this, "Transaction deleted", Toast.LENGTH_SHORT).show()
         }
+        binding.recyclerView.layoutManager = LinearLayoutManager(this)
+        binding.recyclerView.adapter = adapter
 
-        binding.recyclerViewNotes.layoutManager = LinearLayoutManager(this)
-        binding.recyclerViewNotes.adapter = adapter
+        // ✅ Observe LiveData
+        viewModel.allTransactions.observe(this, Observer {
+            adapter.submitList(it)
+            updateSummary(it)
+        })
 
-        // Observe database changes
-        viewModel.allNotes.observe(this) { notes ->
-            adapter.updateNotes(notes)
-        }
+        viewModel.totalIncome.observe(this, Observer { income ->
+            binding.incomeText.text = "Income: ₦${income ?: 0.0}"
+        })
 
-        // Add new note
-        binding.fabAddNote.setOnClickListener {
-            val intent = Intent(this, AddEditNoteActivity::class.java)
-            startActivity(intent)
+        viewModel.totalExpense.observe(this, Observer { expense ->
+            binding.expenseText.text = "Expense: ₦${expense ?: 0.0}"
+        })
+
+        // ✅ Add new transaction
+        binding.addButton.setOnClickListener {
+            val title = binding.titleInput.text.toString()
+            val amountText = binding.amountInput.text.toString()
+            val isExpense = binding.expenseSwitch.isChecked
+
+            if (title.isNotEmpty() && amountText.isNotEmpty()) {
+                val amount = amountText.toDoubleOrNull() ?: 0.0
+                val id = database.push().key!!
+                val type = if (isExpense) "Expense" else "Income"
+
+                val transaction = Transaction(
+                    id = id,
+                    title = title,
+                    amount = amount,
+                    type = type,
+                    date = System.currentTimeMillis().toString()
+                )
+
+                // ✅ Save locally (Room)
+                viewModel.insert(transaction)
+
+                // ✅ Save online (Firebase)
+                database.child(id).setValue(transaction)
+                    .addOnSuccessListener {
+                        Toast.makeText(this, "Transaction added!", Toast.LENGTH_SHORT).show()
+                    }
+                    .addOnFailureListener {
+                        Toast.makeText(this, "Failed to add transaction", Toast.LENGTH_SHORT).show()
+                    }
+
+                // ✅ Clear input fields
+                binding.titleInput.text?.clear()
+                binding.amountInput.text?.clear()
+                binding.expenseSwitch.isChecked = false
+            } else {
+                Toast.makeText(this, "Please fill in all fields", Toast.LENGTH_SHORT).show()
+            }
         }
     }
-}
 
+    private fun updateSummary(transactions: List<Transaction>) {
+        val totalIncome = transactions.filter { it.type == "Income" }.sumOf { it.amount }
+        val totalExpense = transactions.filter { it.type == "Expense" }.sumOf { it.amount }
+        val balance = totalIncome - totalExpense
 
-
-private fun addNoteDialog() {
-        val dialog = NoteDialog(this) { title, content ->
-            val newNote = Note(title = title, content = content)
-            viewModel.insert(newNote)
-        }
-        dialog.show()
-    }
-
-    private fun editNoteDialog(note: Note) {
-        val dialog = NoteDialog(this, note) { title, content ->
-            val updatedNote = note.copy(title = title, content = content)
-            viewModel.update(updatedNote)
-        }
-        dialog.show()
+        binding.incomeText.text = "Income: ₦$totalIncome"
+        binding.expenseText.text = "Expense: ₦$totalExpense"
+        binding.balanceText.text = "Balance: ₦$balance"
     }
 }
